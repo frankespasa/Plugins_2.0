@@ -1,0 +1,44 @@
+#!/usr/bin/php
+<?php
+$exit = 0;
+$version_number = 0.01;
+
+$shortopts = "H:u:p:d:m:o:hvti"; 
+$options = getopt($shortopts);
+
+if (array_key_exists('H', $options)) { $host = $options['H']; } else { $host = "";}
+if (array_key_exists('u', $options)) { $user = $options['u']; } else { $user = "";}
+if (array_key_exists('p', $options)) { $pass = $options['p']; } else { $pass = "";}
+if (array_key_exists('d', $options)) { $domain = $options['d']; } else { $domain = "";}
+if (array_key_exists('m', $options)) { $mode = $options['m']; } else { $mode = "";}
+if (array_key_exists('o', $options)) { $option = $options['o']; } else { $option = "";}
+if (array_key_exists('e', $options)) { $optione = $options['o']; } else { $optione = "";}
+if (array_key_exists('3', $options)) { $option2 = $options['o']; } else { $option2 = "";}
+if (array_key_exists('4', $options)) { $option3 = $options['o']; } else { $option3 = "";}
+if (array_key_exists('5', $options)) { $option3 = $options['o']; } else { $option4 = "";}
+if (array_key_exists('v', $options)) { $version = true; } else { $version = false;}
+if (array_key_exists('t', $options)) { $test = true; } else { $test = false;}
+if (array_key_exists('h', $options)) { $help = true; } else { $help = false;}
+if (array_key_exists('i', $options)) { $info = true; } else { $info = false;}
+
+#var_dump($options);
+
+if ($help) { execute_help(); }
+
+function execute_version() {
+	global $version_number;
+	echo "Version: ".basename($_SERVER["SCRIPT_FILENAME"], '.php')." ".$version_number."\n";
+}
+
+function execute_help() {
+	execute_version ();
+	echo "Help\n";
+}
+
+
+
+
+exit($exit)
+
+
+?>
