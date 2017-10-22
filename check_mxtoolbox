@@ -1,0 +1,110 @@
+#!/usr/bin/php
+<?php
+$exit = 0;
+$version_number = 0.01;
+
+$shortopts = "H:u:p:d:m:o:2:3:4:5:w:c:hvti"; 
+$options = getopt($shortopts);
+
+$valor_final = "";
+$value_out = 0;
+$pnp_out = "";
+
+$out = 0;
+$string_out = "OK - ";
+
+$execute_levels = true;
+
+if (array_key_exists('H', $options)) { $host = $options['H']; } else { $host = "";}
+if (array_key_exists('u', $options)) { $user = $options['u']; } else { $user = "";}
+if (array_key_exists('p', $options)) { $pass = $options['p']; } else { $pass = "";}
+if (array_key_exists('d', $options)) { $domain = $options['d']; } else { $domain = "";}
+if (array_key_exists('m', $options)) { $mode = $options['m']; } else { $mode = "";}
+if (array_key_exists('o', $options)) { $option = $options['o']; } else { $option = "";}
+if (array_key_exists('2', $options)) { $option2 = $options['2']; } else { $option2 = "";}
+if (array_key_exists('3', $options)) { $option3 = $options['3']; } else { $option3 = "";}
+if (array_key_exists('4', $options)) { $option4 = $options['4']; } else { $option4 = "";}
+if (array_key_exists('5', $options)) { $option5 = $options['5']; } else { $option5 = "";}
+if (array_key_exists('w', $options)) { $warning_string = $options['w']; } else { $warning_string = "";}
+if (array_key_exists('c', $options)) { $critical_string = $options['c']; } else { $critical_string = "";}
+if (array_key_exists('v', $options)) { $version = true; } else { $version = false;}
+if (array_key_exists('t', $options)) { $test = true; } else { $test = false;}
+if (array_key_exists('h', $options)) { $help = true; } else { $help = false;}
+if (array_key_exists('i', $options)) { $info = true; } else { $info = false;}
+
+#var_dump($options);
+
+$warning = "";
+$critical = "";
+$warning_low = "";
+$critical_low = "";
+
+if ($help) { execute_help(); }
+
+function execute_version() {
+	global $version_number;
+	echo "Version: ".basename($_SERVER["SCRIPT_FILENAME"], '.php')." ".$version_number."\n";
+}
+
+function execute_help() {
+	execute_version ();
+	echo "Help\n";
+	echo "-m (mode)\n";
+	echo "\t+ list, list all monitors and uid.\n";
+	echo "\t+ monitor, monitor specific uid.\n";
+}
+
+if ($mode != "") {
+	if ($mode == "list") {
+		$url = "https://api.mxtoolbox.com/api/v1/Monitor?authorization=".$option;
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+		$result = curl_exec($ch);
+		curl_close($ch);
+		$json_out = json_decode($result, true);
+		for ($i=0; $i<count($json_out); $i++) {
+			$MonitorUID = $json_out[$i]["MonitorUID"];
+			$Name = $json_out[$i]["Name"];
+			echo $Name.",".$MonitorUID."\n";
+		}
+	}
+	if ($mode == "monitor") {
+		$url = "https://api.mxtoolbox.com/api/v1/Monitor/".$option2."?authorization=".$option;
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+		$result = curl_exec($ch);
+		curl_close($ch);
+		$json_out = json_decode($result, true);
+		$MonitorUID = $json_out["MonitorUID"];
+		$Name = $json_out["Name"];
+		$LastChecked = $json_out["LastChecked"];
+		$MxRep = $json_out["MxRep"];
+		$CurrentStatus = $json_out["CurrentStatus"];
+		$value_out = $CurrentStatus;
+		$critical = 1;
+		$string_salida = "MxToolBox status ".$Name.", reputation (".$MxRep.")";
+		$pnp_out = "status=".$value_out;
+	}
+}
+
+
+
+if ($execute_levels == true) {
+	if ($warning != "") { if ($value_out >= $warning) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical != "") { if ($value_out >= $critical){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($warning_low != "") { if ($value_out <= $warning_low) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical_low != "") { if ($value_out <= $critical_low){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($pnp_out == "") {
+		echo $string_out.$string_salida."\n";
+	} else {
+		echo $string_out.$string_salida." | ".$pnp_out."\n";
+	}
+}
+
+
+exit($out)
+
+
+?>

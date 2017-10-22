@@ -1,0 +1,105 @@
+#!/usr/bin/php
+<?php
+$exit = 0;
+$version_number = 0.01;
+
+$shortopts = "H:u:p:d:m:o:2:3:4:5:6:w:c:hvti"; 
+$options = getopt($shortopts);
+
+$valor_final = "";
+$value_out = 0;
+$pnp_out = "";
+
+$out = 0;
+$string_out = "OK - ";
+
+$execute_levels = true;
+
+if (array_key_exists('H', $options)) { $host = $options['H']; } else { $host = "";}
+if (array_key_exists('u', $options)) { $user = $options['u']; } else { $user = "";}
+if (array_key_exists('p', $options)) { $pass = $options['p']; } else { $pass = "";}
+if (array_key_exists('d', $options)) { $domain = $options['d']; } else { $domain = "";}
+if (array_key_exists('m', $options)) { $mode = $options['m']; } else { $mode = "";}
+if (array_key_exists('o', $options)) { $option = $options['o']; } else { $option = "";}
+if (array_key_exists('2', $options)) { $option2 = $options['2']; } else { $option2 = "";}
+if (array_key_exists('3', $options)) { $option3 = $options['3']; } else { $option3 = "";}
+if (array_key_exists('4', $options)) { $option4 = $options['4']; } else { $option4 = "";}
+if (array_key_exists('5', $options)) { $option5 = $options['5']; } else { $option5 = "";}
+if (array_key_exists('6', $options)) { $option6 = $options['6']; } else { $option5 = "";}
+if (array_key_exists('w', $options)) { $warning_string = $options['w']; } else { $warning_string = "";}
+if (array_key_exists('c', $options)) { $critical_string = $options['c']; } else { $critical_string = "";}
+if (array_key_exists('v', $options)) { $version = true; } else { $version = false;}
+if (array_key_exists('t', $options)) { $test = true; } else { $test = false;}
+if (array_key_exists('h', $options)) { $help = true; } else { $help = false;}
+if (array_key_exists('i', $options)) { $info = true; } else { $info = false;}
+
+#var_dump($options);
+
+$warning = "";
+$critical = "";
+$warning_low = "";
+$critical_low = "";
+
+if ($help) { execute_help(); }
+
+function execute_version() {
+	global $version_number;
+	echo "Version: ".basename($_SERVER["SCRIPT_FILENAME"], '.php')." ".$version_number."\n";
+}
+
+function execute_help() {
+	execute_version ();
+	echo "Help\n";
+	echo "-m (mode)\n";
+	echo "\t+ simple, validate only 1 IP.\n";
+	echo "\t+ double, double IP, firs OK, second W, none C.\n";
+}
+
+if ($mode != "") {
+	if ($mode == "ping_and_double") {
+		$command = "ping -c 3 -W 1 ".$option;
+		echo $return = shell_exec($command);
+		if (strpos($return, " 0%") !== false) { 
+			$command = "traceroute ".$option;
+			echo $return = shell_exec($command);
+			if (strpos($return, $option2) !== false) { $value_out = 0; $ip_traced = $option2; }
+			if (strpos($return, $option3) !== false) { $value_out = 1; $ip_traced = $option3; }
+		} else {
+			$value_out = 2;
+			$ip_traced = "NONE";
+		}
+		$string_salida = "Tracert to ".$option." from ".$ip_traced;
+		$pnp_out = "status=".$value_out;
+		$warning = 1;
+		$critical = 2;
+	}
+	if ($mode == "double") {
+		$command = "traceroute ".$option;
+		$return = shell_exec($command);
+		if (strpos($return, $option2) !== false) { $value_out = 0; $ip_traced = $option2." (".$option5.")"; }
+		if (strpos($return, $option3) !== false) { $value_out = 1; $ip_traced = $option3." (".$option6.")"; }
+		$string_salida = "Tracert to ".$option." (".$option4.") from ".$ip_traced;
+		$pnp_out = "status=".$value_out;
+		$warning = 1;
+		$critical = 2;
+	}
+}
+
+
+if ($execute_levels == true) {
+	if ($warning != "") { if ($value_out >= $warning) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical != "") { if ($value_out >= $critical){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($warning_low != "") { if ($value_out <= $warning_low) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical_low != "") { if ($value_out <= $critical_low){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($pnp_out == "") {
+		echo $string_out.$string_salida."\n";
+	} else {
+		echo $string_out.$string_salida." | ".$pnp_out."\n";
+	}
+}
+
+
+exit($out)
+
+
+?>
