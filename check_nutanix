@@ -1,0 +1,170 @@
+#!/usr/bin/php
+<?php
+$exit = 0;
+$version_number = 0.01;
+
+$shortopts = "H:u:p:d:m:o:2:3:4:5:w:c:hvti"; 
+$options = getopt($shortopts);
+
+$valor_final = "";
+$value_out = 0;
+$pnp_out = "";
+
+$out = 0;
+$string_out = "OK - ";
+$extended_info = "";
+$execute_levels = true;
+
+$warning = "";
+$critical = "";
+$warning_low = "";
+$critical_low = "";
+
+
+if (array_key_exists('H', $options)) { $host = $options['H']; } else { $host = "";}
+if (array_key_exists('u', $options)) { $user = $options['u']; } else { $user = "";}
+if (array_key_exists('p', $options)) { $pass = $options['p']; } else { $pass = "";}
+if (array_key_exists('d', $options)) { $domain = $options['d']; } else { $domain = "";}
+if (array_key_exists('m', $options)) { $mode = $options['m']; } else { $mode = "";}
+if (array_key_exists('o', $options)) { $option = $options['o']; } else { $option = "";}
+if (array_key_exists('2', $options)) { $option2 = $options['2']; } else { $option2 = "";}
+if (array_key_exists('3', $options)) { $option3 = $options['3']; } else { $option3 = "";}
+if (array_key_exists('4', $options)) { $option4 = $options['4']; } else { $option4 = "";}
+if (array_key_exists('5', $options)) { $option5 = $options['5']; } else { $option5 = "";}
+if (array_key_exists('w', $options)) { $warning_string = $options['w']; } else { $warning_string = "";}
+if (array_key_exists('c', $options)) { $critical_string = $options['c']; } else { $critical_string = "";}
+if (array_key_exists('v', $options)) { $version = true; } else { $version = false;}
+if (array_key_exists('t', $options)) { $test = true; } else { $test = false;}
+if (array_key_exists('h', $options)) { $help = true; } else { $help = false;}
+if (array_key_exists('i', $options)) { $info = true; } else { $info = false;}
+
+#var_dump($options);
+
+if ($warning_string != "") {
+	if (strpos($warning_string, ":") !== false) {
+		$warning_array = explode(":",$warning_string);
+		$warning_low = $warning_array[0];
+		$warning = $warning_array[1];
+	} else {
+		$warning = $warning_string;
+	}
+}
+
+if ($critical_string != "") {
+	if (strpos($critical_string, ":") !== false) {
+		$critical_array = explode(":",$critical_string);
+		$critical_low = $critical_array[0];
+		$critical = $critical_array[1];
+	} else {
+		$critical = $critical_string;
+	}
+}
+
+
+if ($help) { execute_help(); }
+
+function execute_version() {
+	global $version_number;
+	echo "Version: ".basename($_SERVER["SCRIPT_FILENAME"], '.php')." ".$version_number."\n";
+}
+
+function execute_help() {
+	execute_version ();
+	echo "Help:\n";
+	echo "\t-m vmmemory [%memory of all VMs]\n";
+	echo "\t-m vmcpu [%cpu of all VMs]\n";
+	echo "\t-m storage [%storage of cluster]\n";
+	echo "\t-m uptimeinstance [seconds uptime instance]\n";
+	echo "\t-m value -o ? [?=name of object in NUTANIX-MIB (example:citAvgLatencyUsecs)]\n";
+	echo "\t-m string -o ? -2 ?? [?=name of object in NUTANIX-MIB (example:clusterStatus), ??=expected string (example:started)]\n";
+	
+}
+
+if (($mode != "") and ($help == false) and ($version == false)) {
+	if (($mode == "vmmemory") or ($mode == "vmcpu")) {
+		if ($mode == "vmmemory") { $state = explode("\n", shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." .1.3.6.1.4.1.41263.10.1.9")); }
+		if ($mode == "vmcpu") { $state = explode("\n", shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." .1.3.6.1.4.1.41263.10.1.7")); }
+		$names = explode("\n", shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." NUTANIX-MIB::vmName"));
+		$oks = 0;
+		$warnings = 0;
+		$criticals = 0;
+		$warnings_low = 0;
+		$criticals_low = 0;
+		$oks_string = "";
+		$warnings_string = "";
+		$criticals_string = "";
+		$warnings_low_string = "";
+		$criticals_low_string = "";
+		for ($i = 0; $i < (count($state)-1); $i++) {
+			$alarma = 0;
+			if ($critical != "") { if (($state[$i] >= $critical) and ($alarma == 0)) { $criticals++; $alarma = 1; $criticals_string .= $names[$i]."(".$state[$i]."%),"; } }
+			if ($warning != "") { if (($state[$i] >= $warning) and ($alarma == 0)) { $warnings++; $alarma = 1; $warnings_string .= $names[$i]."(".$state[$i]."%),"; } }
+			if ($critical_low != "") { if (($state[$i] <= $critical_low) and ($alarma == 0)) { $criticals_low++; $alarma = 1; $criticals_low_string .= $names[$i]."(".$state[$i]."%),"; } }
+			if ($warning_low != "") { if (($state[$i] <= $warning_low) and ($alarma == 0)) { $warnings_low++; $alarma = 1; $warnings_low_string .= $names[$i]."(".$state[$i]."%),"; } }
+			if ($alarma == 0) { $oks++; $oks_string .= $names[$i]."(".$state[$i]."%),"; }
+		}
+		$value_out = 0;
+		$extended_info = "VM->OK\n".substr($oks_string,0,-1)."\n\nVM->WARNING\n".substr(($warnings_low_string.$warnings_string),0,-1)."\n\nVM->CRITICAL\n".substr(($criticals_low_string.$criticals_string),0,-1)."\n";
+		if (($warnings > 0) or ($warnings_low > 0)) { $value_out = 1; }
+		if (($criticals > 0) or ($criticals_low > 0)) { $value_out = 2; }
+		$string_salida = "Run ".$oks." VM OK, and ".($warnings+$criticals+$warnings_low+$criticals_low)." VM out of range.";
+		$pnp_out = "out_of_ranges=".($warnings+$criticals+$warnings_low+$criticals_low);
+		$warning = 1;
+		$critical = 2;
+	}
+	if ($mode == "storage") {
+		$total = shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." NUTANIX-MIB::clusterTotalStorageCapacity")*1;
+		$used = shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." NUTANIX-MIB::clusterUsedStorageCapacity")*1;
+		$value_out = round((($used*100)/$total),2);
+		$string_salida = "Used ".round((((($used/1024)/1024)/1024)/1024),2)." Tb of ".round((((($total/1024)/1024)/1024)/1024),2)." Tb (".$value_out."%) Total";
+		$pnp_out = "storage=".$value_out;
+	}
+
+	if ($mode == "uptimeinstance") {
+		$date = explode(":", shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." .1.3.6.1.2.1.1.3.0"));
+		$days = $date[0]*1;
+		$hours = $date[1]*1;
+		$minuts = $date[2]*1;
+		$seconds = $date[3]*1;
+		$value_out = ($days*86400)+($hours*3600)+($minuts*60)+$seconds;
+		$string_salida = "Uptime ".$days." days, ".$hours." hours, ".$minuts." minuts, ".$seconds." second >> ".$value_out." seconds";
+		$pnp_out = "uptime=".$value_out;
+	}
+
+	if ($mode == "value") {
+		$value_out = 0;
+		$value_out = shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." NUTANIX-MIB::".$option."")*1;
+		$string_salida = "Value for stat ".$option."=".$value_out;
+		$pnp_out = "value=".$value_out;
+	}
+
+	if ($mode == "string") {
+		$value_out = 0;
+		$string = substr(shell_exec("snmpwalk -Oqv -v3 -l authPriv -u ".$user." -a SHA -A ".$pass." -x AES -X ".$pass." ".$host." NUTANIX-MIB::".$option.""),0,-1);
+		if ($string !== $option2) { $value_out = 1; }
+		$string_salida = "Value for stat ".$option."=".$string;
+		$pnp_out = "value=".$value_out;
+		$critical = 1;
+	}
+
+	if ($execute_levels == true) {
+		if ($warning != "") { if ($value_out >= $warning) { $out = 1; $string_out = "WARNING - "; } }
+		if ($critical != "") { if ($value_out >= $critical){ $out = 2; $string_out = "CRITICAL - "; } }
+		if ($warning_low != "") { if ($value_out <= $warning_low) { $out = 1; $string_out = "WARNING - "; } }
+		if ($critical_low != "") { if ($value_out <= $critical_low){ $out = 2; $string_out = "CRITICAL - "; } }
+		if ($pnp_out == "") {
+			echo $string_out.$string_salida."\n";
+		} else {
+			echo $string_out.$string_salida." | ".$pnp_out."\n";
+		}
+		if ($extended_info != "") { echo $extended_info; }
+	}
+
+
+	exit($out);
+
+}
+
+
+
+?>

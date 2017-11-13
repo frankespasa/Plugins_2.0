@@ -1,0 +1,149 @@
+#!/usr/bin/php
+<?php
+$exit = 0;
+$version_number = 0.01;
+
+$shortopts = "H:u:p:d:m:o:2:3:4:5:w:c:hvti"; 
+$options = getopt($shortopts);
+
+$valor_final = "";
+$value_out = 0;
+$pnp_out = "";
+
+$out = 0;
+$string_out = "OK - ";
+
+$execute_levels = true;
+
+if (array_key_exists('H', $options)) { $host = $options['H']; } else { $host = "";}
+if (array_key_exists('u', $options)) { $user = $options['u']; } else { $user = "";}
+if (array_key_exists('p', $options)) { $pass = $options['p']; } else { $pass = "";}
+if (array_key_exists('d', $options)) { $domain = $options['d']; } else { $domain = "";}
+if (array_key_exists('m', $options)) { $mode = $options['m']; } else { $mode = "";}
+if (array_key_exists('o', $options)) { $option = $options['o']; } else { $option = "";}
+if (array_key_exists('2', $options)) { $option2 = $options['2']; } else { $option2 = "";}
+if (array_key_exists('3', $options)) { $option3 = $options['3']; } else { $option3 = "";}
+if (array_key_exists('4', $options)) { $option4 = $options['4']; } else { $option4 = "";}
+if (array_key_exists('5', $options)) { $option5 = $options['5']; } else { $option5 = "";}
+if (array_key_exists('w', $options)) { $warning_string = $options['w']; } else { $warning_string = "";}
+if (array_key_exists('c', $options)) { $critical_string = $options['c']; } else { $critical_string = "";}
+if (array_key_exists('v', $options)) { $version = true; } else { $version = false;}
+if (array_key_exists('t', $options)) { $test = true; } else { $test = false;}
+if (array_key_exists('h', $options)) { $help = true; } else { $help = false;}
+if (array_key_exists('i', $options)) { $info = true; } else { $info = false;}
+
+#var_dump($options);
+
+$warning = "";
+$critical = "";
+$warning_low = "";
+$critical_low = "";
+
+if ($help) { execute_help(); }
+
+function execute_version() {
+	global $version_number;
+	echo "Version: ".basename($_SERVER["SCRIPT_FILENAME"], '.php')." ".$version_number."\n";
+}
+
+function execute_help() {
+	execute_version ();
+	echo "Help\n";
+}
+
+if ($mode != "") {
+	if ($mode == "raidboard") {
+		$state = shell_exec("snmpget -Oqv -c ".$option." -v 2c ".$host." 1.3.6.1.4.1.9.9.719.1.45.1.1.6.1")*1;
+		$name = shell_exec("snmpget -Oqv -c ".$option." -v 2c ".$host." 1.3.6.1.4.1.9.9.719.1.45.1.1.5.1");
+		$name = str_replace("\n","",$name);
+		$value_out = 0;
+		if ($state != 1) { $value_out = 2; }
+		$string_salida = "Board ".$name." has state ".$state;
+		$pnp_out = "state=".$state;
+		$critical = 2;
+	}
+
+	if ($mode == "disks") {
+		$state = explode("\n", shell_exec("snmpwalk -Oqv -c ".$option." -v 2c ".$host." 1.3.6.1.4.1.9.9.719.1.45.4.1.9"));
+		$operational = 0;
+		$error = 0;
+		$none = 0;
+		for ($i = 0; $i < (count($state)-1); $i++) {
+			if ($state[$i] == 1) {
+				$operational++;
+			} else {
+				if ($state[$i] == 6) { 
+					$none++;
+				} else {
+					$error++;
+				}
+			}
+		}
+		$value_out = 0;
+		if ($error > 0) { $value_out = 2; }
+		$string_salida = "Exist ".$operational." operational disks and ".$error." disks with errors.";
+		$pnp_out = "errors=".$error;
+		$critical = 2;
+	}
+
+	if ($mode == "ram") {
+		$state = explode("\n", shell_exec("snmpwalk -Oqv -c ".$option." -v 2c ".$host." 1.3.6.1.4.1.9.9.719.1.30.11.1.14"));
+		$operational = 0;
+		$error = 0;
+		$none = 0;
+		for ($i = 0; $i < (count($state)-1); $i++) {
+			if ($state[$i] == 1) {
+				$operational++;
+			} else {
+				if ($state[$i] == 0) { 
+					$none++;
+				} else {
+					$error++;
+				}
+			}
+		}
+		$value_out = 0;
+		if ($error > 0) { $value_out = 2; }
+		$string_salida = "Exist ".$operational." operational ram modules and ".$error." ram modules with errors.";
+		$pnp_out = "errors=".$error;
+		$critical = 2;
+	}
+
+	if ($mode == "cpu") {
+		$state = explode("\n", shell_exec("snmpwalk -Oqv -c ".$option." -v 2c ".$host." 1.3.6.1.4.1.9.9.719.1.41.9.1.9"));
+		$operational = 0;
+		$error = 0;
+		for ($i = 0; $i < (count($state)-1); $i++) {
+			if ($state[$i] == 1) {
+				$operational++;
+			} else {
+				$error++;
+			}
+		}
+		$value_out = 0;
+		if ($error > 0) { $value_out = 2; }
+		$string_salida = "Exist ".$operational." operational cpus and ".$error." cpus with errors.";
+		$pnp_out = "errors=".$error;
+		$critical = 2;
+	}
+}
+
+
+
+if ($execute_levels == true) {
+	if ($warning != "") { if ($value_out >= $warning) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical != "") { if ($value_out >= $critical){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($warning_low != "") { if ($value_out <= $warning_low) { $out = 1; $string_out = "WARNING - "; } }
+	if ($critical_low != "") { if ($value_out <= $critical_low){ $out = 2; $string_out = "CRITICAL - "; } }
+	if ($pnp_out == "") {
+		echo $string_out.$string_salida."\n";
+	} else {
+		echo $string_out.$string_salida." | ".$pnp_out."\n";
+	}
+}
+
+
+exit($exit)
+
+
+?>
